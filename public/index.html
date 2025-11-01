@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>ToDo勉強用ミニアプリ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Knockout CDN -->
+  <script src="knockout-min.js"></script>
+  
+  <style>
+    body { font-family: sans-serif; max-width: 600px; margin: 20px auto; }
+    h1 { font-size: 1.4rem; }
+    ul { list-style: none; padding: 0; }
+    li { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    button { cursor: pointer; }
+    form { margin-bottom: 16px; }
+    input[type="text"] { width: 70%; padding: 4px; }
+  </style>
+</head>
+<body>
+  <h1>ToDo（勉強会用）</h1>
+
+  <form data-bind="submit: addTodo">
+    <input type="text" placeholder="やること..." data-bind="value: newTitle" />
+    <button type="submit">追加</button>
+  </form>
+
+  <p data-bind="visible: todos().length === 0">まだ何もありません</p>
+
+  <ul data-bind="foreach: todos">
+    <li>
+      <span data-bind="text: title"></span>
+      <button data-bind="click: $parent.removeTodo">削除</button>
+    </li>
+  </ul>
+
+  <script>
+    function AppViewModel() {
+      const self = this;
+      self.todos = ko.observableArray([]);
+      self.newTitle = ko.observable('');
+
+      // 初期読み込み
+      self.load = async function () {
+        const res = await fetch('/api/todos');
+        const data = await res.json();
+        self.todos(data);
+      };
+
+      // 追加
+      self.addTodo = async function () {
+        const title = self.newTitle();
+        if (!title.trim()) return;
+
+        const res = await fetch('/api/todos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title })
+        });
+        const created = await res.json();
+        self.todos.push(created);
+        self.newTitle('');
+      };
+
+      // 削除
+      self.removeTodo = async function (todo) {
+        await fetch('/api/todos/' + todo.id, {
+          method: 'DELETE'
+        });
+        self.todos.remove(todo);
+      };
+
+      self.load();
+    }
+
+    ko.applyBindings(new AppViewModel());
+  </script>
+</body>
+</html>
