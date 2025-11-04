@@ -9,5 +9,6 @@ Backend: **Node.js (Express)**
 npm install 
 npm start
 
-## 📸 Scrrenshot
+## 📸 Screenshot
 ![App Screenshot](./screenshot.png)
+
