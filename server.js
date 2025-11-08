@@ -1,47 +1,37 @@
-// server.js
 const express = require('express');
-const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
 const app = express();
-const PORT = 3000;
+const port = 3000;
 
-// ボディをJSONとして受け取る
 app.use(express.json());
+app.use(express.static('public'));
 
-// public配下を静的ファイルとして配信
-app.use(express.static(path.join(__dirname, 'public')));
+const db = new sqlite3.Database('./todo.db');
 
-// メモリに持つToDoデータ（本当はDBだけど今日はこれでOK）
-let todos = [
-  { id: 1, title: '資料を読む' },
-  { id: 2, title: 'APIを確認' },
-];
+// テーブル作成
+db.run(`CREATE TABLE IF NOT EXISTS todos (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT
+)`);
 
-// 一覧取得
+// GET
 app.get('/api/todos', (req, res) => {
-  res.json(todos);
+  db.all('SELECT * FROM todos', (err, rows) => res.json(rows));
 });
 
-// 追加
+// POST
 app.post('/api/todos', (req, res) => {
   const { title } = req.body;
-  if (!title || title.trim() === '') {
-    return res.status(400).json({ message: 'titleは必須です' });
-  }
-  const newTodo = {
-    id: Date.now(),
-    title: title.trim(),
-  };
-  todos.push(newTodo);
-  res.status(201).json(newTodo);
+  db.run('INSERT INTO todos (title) VALUES (?)', [title], function() {
+    res.json({ id: this.lastID, title });
+  });
 });
 
-// 削除
+// DELETE
 app.delete('/api/todos/:id', (req, res) => {
-  const id = Number(req.params.id);
-  todos = todos.filter((t) => t.id !== id);
-  res.status(204).send();
+  db.run('DELETE FROM todos WHERE id = ?', [req.params.id], function() {
+    res.sendStatus(204);
+  });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running: http://localhost:${PORT}`);
-});
+app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
