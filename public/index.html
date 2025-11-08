@@ -4,17 +4,16 @@
   <meta charset="UTF-8" />
   <title>ToDo勉強用ミニアプリ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Knockout CDN -->
   <script src="knockout-min.js"></script>
-  
   <style>
-    body { font-family: sans-serif; max-width: 600px; margin: 20px auto; }
+    body { font-family: sans-serif; max-width: 680px; margin: 24px auto; }
     h1 { font-size: 1.4rem; }
     ul { list-style: none; padding: 0; }
-    li { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    li { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .title { flex: 1; }
+    .done { color: #888; text-decoration: line-through; }
     button { cursor: pointer; }
-    form { margin-bottom: 16px; }
-    input[type="text"] { width: 70%; padding: 4px; }
+    input[type="text"] { width: 70%; padding: 6px; }
   </style>
 </head>
 <body>
@@ -29,7 +28,10 @@
 
   <ul data-bind="foreach: todos">
     <li>
-      <span data-bind="text: title"></span>
+      <!-- 完了チェック -->
+      <input type="checkbox" data-bind="checked: done, click: $parent.toggleDone" />
+      <!-- タイトル（doneなら取り消し線） -->
+      <span class="title" data-bind="text: title, css: { done: done }"></span>
       <button data-bind="click: $parent.removeTodo">削除</button>
     </li>
   </ul>
@@ -40,39 +42,49 @@
       self.todos = ko.observableArray([]);
       self.newTitle = ko.observable('');
 
-      // 初期読み込み
+      // 初期読込
       self.load = async function () {
         const res = await fetch('/api/todos');
         const data = await res.json();
-        self.todos(data);
+        // doneはBooleanとして扱う
+        const mapped = data.map(x => ({ id: x.id, title: x.title, done: ko.observable(!!x.done) }));
+        self.todos(mapped);
       };
 
       // 追加
       self.addTodo = async function () {
         const title = self.newTitle();
         if (!title.trim()) return;
-
         const res = await fetch('/api/todos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title })
         });
         const created = await res.json();
-        self.todos.push(created);
+        self.todos.unshift({ id: created.id, title: created.title, done: ko.observable(false) });
         self.newTitle('');
+      };
+
+      // 完了トグル
+      self.toggleDone = async function (todo, evt) {
+        // Knockoutのcheckedバインド後にイベントが飛ぶことがあるので
+        // 現在の状態をobservableから取得
+        const now = !!todo.done();
+        await fetch('/api/todos/' + todo.id + '/done', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ done: now })
+        });
       };
 
       // 削除
       self.removeTodo = async function (todo) {
-        await fetch('/api/todos/' + todo.id, {
-          method: 'DELETE'
-        });
+        await fetch('/api/todos/' + todo.id, { method: 'DELETE' });
         self.todos.remove(todo);
       };
 
       self.load();
     }
-
     ko.applyBindings(new AppViewModel());
   </script>
 </body>
